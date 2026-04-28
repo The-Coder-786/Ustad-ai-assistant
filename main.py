@@ -1,4 +1,5 @@
 import ollama
+import subprocess
 
 def start_ustad():
     print("========================================")
@@ -6,37 +7,51 @@ def start_ustad():
     print("   Type 'exit' to shutdown.             ")
     print("========================================\n")
     
-    # The System Prompt tells the AI who it is and how to behave
+    # We updated the System Prompt to teach him the [EXECUTE] command
     chat_history = [
         {
             'role': 'system',
-            'content': 'You are Ustad, a highly intelligent and concise AI assistant running locally on a Windows laptop. Your goal is to help the user manage their system, write code, and solve technical problems. Keep your answers brief, professional, and directly to the point.'
+            'content': 'You are Ustad, a local Windows AI assistant. You can chat normally. IF the user asks you to open a basic Windows application (like notepad, calc, or explorer), you MUST output ONLY the command wrapped in [EXECUTE] tags. Example: [EXECUTE] notepad. Do not add any other text.'
         }
     ]
     
-    # The Infinite Loop keeps the conversation going
     while True:
-        # 1. Get your input
         user_input = input("You: ")
         
-        # 2. Check if you want to quit
         if user_input.lower() in ['exit', 'quit']:
             print("\nUstad: Shutting down. Goodbye.")
             break
             
-        # 3. Add your message to the memory
         chat_history.append({'role': 'user', 'content': user_input})
         
-        # 4. Send the memory to the Brain
         try:
             response = ollama.chat(model='llama3', messages=chat_history)
             ai_reply = response['message']['content']
             
-            # 5. Print Ustad's reply
-            print(f"\nUstad: {ai_reply}\n")
-            
-            # 6. Add Ustad's reply to the memory so he remembers it for next time
-            chat_history.append({'role': 'assistant', 'content': ai_reply})
+            # --- THE NEW HANDS LOGIC ---
+            # We check if Ustad used the secret tag
+            if "[EXECUTE]" in ai_reply:
+                # Clean up the text to get just the command
+                command = ai_reply.replace("[EXECUTE]", "").replace("`", "").strip()
+                print(f"\n[System]: Ustad is executing command: {command}...")
+                
+                try:
+                    # subprocess.Popen runs the command without freezing the chat
+                    subprocess.Popen(command, shell=True)
+                    action_result = f"Successfully opened {command}."
+                except Exception as e:
+                    action_result = f"Failed to open {command}. Error: {e}"
+                    
+                print(f"[System]: {action_result}\n")
+                
+                # We save the action to memory so Ustad knows it worked
+                chat_history.append({'role': 'assistant', 'content': ai_reply})
+                chat_history.append({'role': 'system', 'content': action_result})
+                
+            else:
+                # If there's no tag, just chat normally
+                print(f"\nUstad: {ai_reply}\n")
+                chat_history.append({'role': 'assistant', 'content': ai_reply})
             
         except Exception as e:
             print(f"\n[System Error]: {e}\n")
